@@ -1,7 +1,6 @@
-const {chrome} = require('@doctormckay/user-agents');
 const Request = require('request');
 const SteamID = require('steamid');
-
+const { headers } = require('./components/customua.js');
 const Helpers = require('./components/helpers.js');
 
 require('util').inherits(SteamCommunity, require('events').EventEmitter);
@@ -27,9 +26,8 @@ function SteamCommunity(options) {
 		"jar": this._jar,
 		"timeout": options.timeout || 50000,
 		"gzip": true,
-		"headers": {
-			"User-Agent": options.userAgent || chrome()
-		}
+		"headers": headers,
+		"proxy": options.socksProxy || options.httpProxy || null
 	};
 
 	if (typeof options == "string") {
