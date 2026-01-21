@@ -1,6 +1,101 @@
 var URL = require('url');
 
 var SteamCommunity = require('../index.js');
+SteamCommunity.prototype._performHttpRequest = function(options, callback) {
+	var self = this;
+
+	if (!this._httpClient) {
+		return callback(new Error('HTTP client not initialized'));
+	}
+
+	options = options || {};
+
+	var url = options.url || options.uri;
+	var method = (options.method || 'GET').toUpperCase();
+
+	// Determine if caller expects JSON response
+	var expectJson = options.json === true;
+	var encoding = options.encoding;
+
+	var followRedirects = true;
+	if (typeof options.followRedirect === 'boolean') {
+		followRedirects = options.followRedirect;
+	}
+	if (typeof options.followAllRedirects === 'boolean') {
+		followRedirects = options.followAllRedirects;
+	}
+
+	var httpOptions = {
+		method: method,
+		url: url,
+		headers: options.headers || {},
+		queryString: options.qs,
+		followRedirects: followRedirects,
+		timeout: options.timeout,
+		rejectUnauthorized: options.rejectUnauthorized
+	};
+
+	// Request body mapping
+	if (options.formData) {
+		httpOptions.multipartForm = {};
+		for (var field in options.formData) {
+			if (!options.formData.hasOwnProperty(field)) {
+				continue;
+			}
+
+			var val = options.formData[field];
+
+			if (val && typeof val === 'object' && Object.prototype.hasOwnProperty.call(val, 'value')) {
+				var opts = val.options || {};
+
+				httpOptions.multipartForm[field] = {
+					content: val.value,
+					contentType: opts.contentType,
+					filename: opts.filename
+				};
+			} else {
+				httpOptions.multipartForm[field] = {
+					content: val
+				};
+			}
+		}
+	} else if (options.form) {
+		httpOptions.urlEncodedForm = options.form;
+	} else if (options.body) {
+		httpOptions.body = options.body;
+	}
+
+	this._httpClient.request(httpOptions).then(function(response) {
+		var body;
+
+		if (expectJson) {
+			body = response.jsonBody;
+		} else if (encoding === null) {
+			body = response.rawBody;
+		} else if (typeof response.textBody === 'string') {
+			body = response.textBody;
+		} else {
+			body = response.rawBody;
+		}
+
+		var responseLike = {
+			statusCode: response.statusCode,
+			statusMessage: response.statusMessage,
+			headers: response.headers,
+			body: body,
+			url: response.url,
+			request: {
+				uri: {
+					href: response.url
+				}
+			}
+		};
+
+		callback.call(self, null, responseLike, body);
+	}).catch(function(err) {
+		callback.call(self, err);
+	});
+};
 
 SteamCommunity.prototype.httpRequest = function(uri, options, callback, source) {
 	if (typeof uri === 'object') {
@@ -26,7 +121,7 @@ SteamCommunity.prototype.httpRequest = function(uri, options, callback, source) 
 	if ((options.method || 'GET').toUpperCase() != 'GET') {
 		options.headers = options.headers || {};
 		if (!options.headers.origin) {
-			var parsedUrl = URL.parse(options.url);
+			var parsedUrl = new URL(options.url);
 			options.headers.origin = parsedUrl.protocol + '//' + parsedUrl.host;
 		}
 	}
@@ -57,7 +152,7 @@ SteamCommunity.prototype.httpRequest = function(uri, options, callback, source) 
 			return;
 		}
 
-		self.request(options, function (err, response, body) {
+		self._performHttpRequest(options, function (err, response, body) {
 			var hasCallback = !!callback;
 			var httpError = options.checkHttpError !== false && self._checkHttpError(err, response, callback, body);
 			var communityError = !options.json && options.checkCommunityError !== false && self._checkCommunityError(body, httpError ? function () {} : callback); // don't fire the callback if hasHttpError did it already

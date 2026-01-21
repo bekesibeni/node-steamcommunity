@@ -2,9 +2,7 @@ var SteamCommunity = require('../index.js');
 var CEconItem = require('../classes/CEconItem.js');
 var Helpers = require('./helpers.js');
 var SteamID = require('steamid');
-var request = require('request');
 var Cheerio = require('cheerio');
-var Async = require('async');
 
 /*
  * Inventory history in a nutshell.
@@ -142,19 +140,26 @@ SteamCommunity.prototype.getInventoryHistory = function(options, callback) {
 			output.trades.push(trade);
 		}
 
-		if (options.resolveVanityURLs) {
-			Async.map(vanityURLs, Helpers.resolveVanityURL, function(err, results) {
-				if (err) {
-					callback(err);
-					return;
-				}
+		if (options.resolveVanityURLs && vanityURLs.length > 0) {
+			var promises = vanityURLs.map(function(vanity) {
+				return new Promise(function(resolve, reject) {
+					Helpers.resolveVanityURL(vanity, function(err, result) {
+						if (err) {
+							reject(err);
+							return;
+						}
 
+						resolve(result);
+					});
+				});
+			});
+
+			Promise.all(promises).then(function(results) {
 				for (i = 0; i < output.trades.length; i++) {
 					if (output.trades[i].partnerSteamID || !output.trades[i].partnerVanityURL) {
 						continue;
 					}
 
-					// Find the vanity URL
 					for (j = 0; j < results.length; j++) {
 						if (results[j].vanityURL == output.trades[i].partnerVanityURL) {
 							output.trades[i].partnerSteamID = new SteamID(results[j].steamID);
@@ -164,6 +169,8 @@ SteamCommunity.prototype.getInventoryHistory = function(options, callback) {
 				}
 
 				callback(null, output);
+			}).catch(function(err) {
+				callback(err);
 			});
 		} else {
 			callback(null, output);

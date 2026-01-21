@@ -1,7 +1,6 @@
 var SteamCommunity = require('../index.js');
 var Cheerio = require('cheerio');
 var SteamTotp = require('steam-totp');
-var Async = require('async');
 
 var CConfirmation = require('../classes/CConfirmation.js');
 var EConfirmationType = require('../resources/EConfirmationType.js');
@@ -329,25 +328,6 @@ SteamCommunity.prototype.checkConfirmations = function() {
 	}
 
 	var self = this;
-	if(!this._confirmationQueue) {
-		this._confirmationQueue = Async.queue(function(conf, callback) {
-			// Worker to process new confirmations
-			if(self._identitySecret) {
-				// We should accept this
-				self.emit('debug', "Accepting confirmation #" + conf.id);
-				var time = Math.floor(Date.now() / 1000);
-				conf.respond(time, SteamTotp.getConfirmationKey(self._identitySecret, time, "allow"), true, function(err) {
-					// If there was an error and it wasn't actually accepted, we'll pick it up again
-					if (!err) self.emit('confirmationAccepted', conf);
-					delete self._knownConfirmations[conf.id];
-					setTimeout(callback, 1000); // Call the callback in 1 second, to make sure the time changes
-				});
-			} else {
-				self.emit('newConfirmation', conf);
-				setTimeout(callback, 1000); // Call the callback in 1 second, to make sure the time changes
-			}
-		}, 1);
-	}
 
 	this.emit('debug', 'Checking confirmations');
 
@@ -378,7 +358,7 @@ SteamCommunity.prototype.checkConfirmations = function() {
 			// We have new confirmations!
 			newOnes.forEach(function(conf) {
 				self._knownConfirmations[conf.id] = conf; // Add it to our list of known confirmations
-				self._confirmationQueue.push(conf);
+				enqueueConfirmation(self, conf);
 			});
 
 			resetTimer();
@@ -391,6 +371,58 @@ SteamCommunity.prototype.checkConfirmations = function() {
 		}
 	}
 };
+
+function enqueueConfirmation(community, conf) {
+	if (!community._confirmationQueueState) {
+		community._confirmationQueueState = {
+			items: [],
+			processing: false
+		};
+	}
+
+	community._confirmationQueueState.items.push(conf);
+
+	if (!community._confirmationQueueState.processing) {
+		processNextConfirmation(community);
+	}
+}
+
+function processNextConfirmation(community) {
+	var state = community._confirmationQueueState;
+	if (!state) {
+		return;
+	}
+
+	var conf = state.items.shift();
+	if (!conf) {
+		state.processing = false;
+		return;
+	}
+
+	state.processing = true;
+
+	if (community._identitySecret) {
+		community.emit('debug', "Accepting confirmation #" + conf.id);
+		var time = Math.floor(Date.now() / 1000);
+		conf.respond(time, SteamTotp.getConfirmationKey(community._identitySecret, time, "allow"), true, function(err) {
+			// If there was an error and it wasn't actually accepted, we'll pick it up again
+			if (!err) {
+				community.emit('confirmationAccepted', conf);
+			}
+			delete community._knownConfirmations[conf.id];
+
+			setTimeout(function() {
+				processNextConfirmation(community);
+			}, 1000);
+		});
+	} else {
+		community.emit('newConfirmation', conf);
+
+		setTimeout(function() {
+			processNextConfirmation(community);
+		}, 1000);
+	}
+}
 
 SteamCommunity.prototype.acknowledgeTradeProtection = function(callback) {
 	this.httpRequestPost({

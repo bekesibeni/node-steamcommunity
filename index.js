@@ -1,6 +1,7 @@
-const Request = require('request');
+const {HttpClient, getProxyAgent} = require('@doctormckay/stdlib/http');
+const {SocksProxyAgent} = require('socks-proxy-agent');
+const {chrome} = require('@doctormckay/user-agents');
 const SteamID = require('steamid');
-const { headers } = require('./components/customua.js');
 const Helpers = require('./components/helpers.js');
 
 require('util').inherits(SteamCommunity, require('events').EventEmitter);
@@ -17,17 +18,15 @@ SteamCommunity.EFriendRelationship = require('./resources/EFriendRelationship.js
 function SteamCommunity(options) {
 	options = options || {};
 
-	this._jar = Request.jar();
+	this._httpClient = null;
+	this._jar = null;
 	this._captchaGid = -1;
 	this._httpRequestID = 0;
 	this.chatState = SteamCommunity.ChatState.Offline;
 
-	var defaults = {
-		"jar": this._jar,
-		"timeout": options.timeout || 50000,
-		"gzip": true,
-		"headers": headers,
-		"proxy": options.socksProxy || options.httpProxy || null
+	var userAgent = options.userAgent || chrome();
+	var defaultHeaders = {
+		"user-agent": userAgent
 	};
 
 	if (typeof options == "string") {
@@ -37,18 +36,33 @@ function SteamCommunity(options) {
 	}
 	this._options = options;
 
-	if (options.localAddress) {
-		defaults.localAddress = options.localAddress;
+	let httpAgent, httpsAgent;
+	if (options.socksProxy) {
+		httpAgent = new SocksProxyAgent(options.socksProxy);
+		httpsAgent = new SocksProxyAgent(options.socksProxy);
+	} else if (options.httpProxy) {
+		httpAgent = getProxyAgent(false, options.httpProxy);
+		httpsAgent = getProxyAgent(true, options.httpProxy);
 	}
 
-	this.request = options.request || Request.defaults({"forever": true}); // "forever" indicates that we want a keep-alive agent
-	this.request = this.request.defaults(defaults);
+	this._httpClient = new HttpClient({
+		userAgent: userAgent,
+		defaultHeaders: defaultHeaders,
+		defaultTimeout: options.timeout || 50000,
+		cookieJar: true,
+		gzip: true,
+		localAddress: options.localAddress,
+		httpAgent,
+		httpsAgent
+	});
+
+	this._jar = this._httpClient.cookieJar;
 
 	// English
-	this._setCookie(Request.cookie('Steam_Language=english'));
+	this._setCookie('Steam_Language=english');
 
 	// UTC
-	this._setCookie(Request.cookie('timezoneOffset=0,0'));
+	this._setCookie('timezoneOffset=0,0');
 }
 
 SteamCommunity.prototype.login = function(details, callback) {
@@ -149,16 +163,34 @@ SteamCommunity.prototype.getClientLogonToken = function(callback) {
 };
 
 SteamCommunity.prototype._setCookie = function(cookie, secure) {
-	var protocol = secure ? "https" : "http";
-	cookie.secure = !!secure;
-
-	if (cookie.domain) {
-		this._jar.setCookie(cookie.clone(), protocol + '://' + cookie.domain);
-	} else {
-		this._jar.setCookie(cookie.clone(), protocol + "://steamcommunity.com");
-		this._jar.setCookie(cookie.clone(), protocol + "://store.steampowered.com");
-		this._jar.setCookie(cookie.clone(), protocol + "://help.steampowered.com");
+	if (!this._jar || typeof this._jar.add !== 'function') {
+		return;
 	}
+
+	// The stdlib CookieJar works with Set-Cookie header strings and a host.
+	// Mirror previous behavior by applying our cookie to the relevant Steam hosts.
+	var domains = [];
+
+	// If a domain attribute is present in the cookie string, just add it once with that domain.
+	if (typeof cookie === 'string' && /;\s*domain=/i.test(cookie)) {
+		// Extract the domain attribute value
+		var match = cookie.match(/;\s*domain=([^;]+)/i);
+		if (match && match[1]) {
+			domains.push(match[1].trim());
+		}
+	}
+
+	if (domains.length === 0) {
+		domains = [
+			'steamcommunity.com',
+			'store.steampowered.com',
+			'help.steampowered.com'
+		];
+	}
+
+	domains.forEach((domain) => {
+		this._jar.add(cookie, domain);
+	});
 };
 
 SteamCommunity.prototype.setCookies = function(cookies) {
@@ -168,7 +200,7 @@ SteamCommunity.prototype.setCookies = function(cookies) {
 			this.steamID = new SteamID(cookie.match(/steamLogin(Secure)?=(\d+)/)[2]);
 		}
 
-		this._setCookie(Request.cookie(cookie), !!(cookieName.match(/^steamMachineAuth/) || cookieName.match(/Secure$/)));
+		this._setCookie(cookie, !!(cookieName.match(/^steamMachineAuth/) || cookieName.match(/Secure$/)));
 	});
 
 	// The account we're logged in as might have changed, so verify that our mobile access token (if any) is still valid
@@ -177,17 +209,36 @@ SteamCommunity.prototype.setCookies = function(cookies) {
 };
 
 SteamCommunity.prototype.getSessionID = function(host = "http://steamcommunity.com") {
-	var cookies = this._jar.getCookieString(host).split(';');
-	for(var i = 0; i < cookies.length; i++) {
-		var match = cookies[i].trim().match(/([^=]+)=(.+)/);
-		if(match[1] == 'sessionid') {
-			return decodeURIComponent(match[2]);
+	if (this._jar && typeof this._jar.getCookieHeaderForUrl === 'function') {
+		var cookieHeader = this._jar.getCookieHeaderForUrl(host);
+		if (cookieHeader) {
+			var cookies = cookieHeader.split(';');
+			for (var i = 0; i < cookies.length; i++) {
+				var match = cookies[i].trim().match(/([^=]+)=(.+)/);
+				if (match && match[1] == 'sessionid') {
+					return decodeURIComponent(match[2]);
+				}
+			}
 		}
 	}
 
 	var sessionID = generateSessionID();
-	this._setCookie(Request.cookie('sessionid=' + sessionID));
+	this._setCookie('sessionid=' + sessionID);
 	return sessionID;
+};
+
+/**
+ * Get the Cookie header value which would be sent for the given URL.
+ * Primarily intended for internal debugging and testing.
+ * @param {string} url
+ * @returns {string}
+ */
+SteamCommunity.prototype.getCookies = function(url) {
+	if (!this._jar || typeof this._jar.getCookieHeaderForUrl !== 'function') {
+		return '';
+	}
+
+	return this._jar.getCookieHeaderForUrl(url || 'https://steamcommunity.com') || '';
 };
 
 function generateSessionID() {

@@ -1,8 +1,10 @@
-const request = require('request');
+const {HttpClient} = require('@doctormckay/stdlib/http');
 const SteamID = require('steamid');
 const xml2js  = require('xml2js');
 
 const EResult = require('../resources/EResult.js');
+
+const _vanityHttpClient = new HttpClient();
 
 exports.isSteamID = function(input) {
 	var keys = Object.keys(input);
@@ -83,11 +85,11 @@ exports.resolveVanityURL = function(url, callback) {
 	}
 
 	// Make request to get XML data
-	request(url + "/?xml=1", function(err, response, body) {
-		if (err) {
-			callback(err);
-			return;
-		}
+	_vanityHttpClient.request({
+		method: 'GET',
+		url: url + "/?xml=1"
+	}).then((response) => {
+		let body = typeof response.textBody === 'string' ? response.textBody : response.rawBody.toString('utf8');
 
 		// Parse XML data returned from Steam into an object
 		new xml2js.Parser().parseString(body, (err, parsed) => {
@@ -106,6 +108,8 @@ exports.resolveVanityURL = function(url, callback) {
 
 			callback(null, {"vanityURL": vanityURL, "steamID": steamID64});
 		});
+	}).catch((err) => {
+		callback(err);
 	});
 };
 
