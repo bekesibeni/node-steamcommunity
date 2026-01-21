@@ -1,4 +1,4 @@
-var URL = require('url');
+const { URL } = require('url');
 
 var SteamCommunity = require('../index.js');
 SteamCommunity.prototype._performHttpRequest = function(options, callback) {
