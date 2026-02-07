@@ -649,10 +649,11 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 
 			for (var i = 0; i < body.assets.length; i++) {
 				var description = getDescription(body.descriptions, body.assets[i].classid, body.assets[i].instanceid);
+				var assetProps = getAssetProperties(body.asset_properties, body.assets[i].assetid);
 
 				if (!tradableOnly || (description && description.tradable)) {
 					body.assets[i].pos = pos++;
-					(body.assets[i].currencyid ? currency : inventory).push(new CEconItem(body.assets[i], description, contextID));
+					(body.assets[i].currencyid ? currency : inventory).push(new CEconItem(body.assets[i], description, contextID, assetProps));
 				}
 			}
 
@@ -666,6 +667,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 
 	// A bit of optimization; objects are hash tables so it's more efficient to look up by key than to iterate an array
 	var quickDescriptionLookup = {};
+	var quickAssetPropertiesLookup = {};
 
 	function getDescription(descriptions, classID, instanceID) {
 		var key = classID + '_' + (instanceID || '0'); // instanceID can be undefined, in which case it's 0.
@@ -679,6 +681,26 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 		}
 
 		return quickDescriptionLookup[key];
+	}
+
+	// Look up raw asset_properties entry by assetid (same pattern as getDescription). Parsing is done in CEconItem.
+	function getAssetProperties(assetProperties, assetid) {
+		if (!assetProperties || !Array.isArray(assetProperties)) {
+			return undefined;
+		}
+
+		if (quickAssetPropertiesLookup[assetid]) {
+			return quickAssetPropertiesLookup[assetid];
+		}
+
+		for (var i = 0; i < assetProperties.length; i++) {
+			var entry = assetProperties[i];
+			if (entry && entry.assetid) {
+				quickAssetPropertiesLookup[entry.assetid] = entry;
+			}
+		}
+
+		return quickAssetPropertiesLookup[assetid];
 	}
 };
 

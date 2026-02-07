@@ -1,10 +1,53 @@
 module.exports = CEconItem;
 
-function CEconItem(item, description, contextID) {
+function CEconItem(item, description, contextID, assetProperties) {
 	var thing;
 	for (thing in item) {
 		if (item.hasOwnProperty(thing)) {
 			this[thing] = item[thing];
+		}
+	}
+
+	// Main asset_properties: 1 = paint_seed, 2 = float_value, 3 = charm_template, 5 = nametag, 6 = item_certificate, 7 = finish_catalog
+	// propertyid 4 = sticker_wear lives in asset_accessories[].parent_relationship_properties
+	this.asset_properties = {};
+	if (assetProperties && assetProperties.asset_properties && Array.isArray(assetProperties.asset_properties)) {
+		var props = assetProperties.asset_properties;
+		for (var i = 0; i < props.length; i++) {
+			var p = props[i];
+			if (p.propertyid === 1 && p.int_value !== undefined) {
+				this.asset_properties.paint_seed = parseInt(p.int_value, 10);
+			} else if (p.propertyid === 2 && p.float_value !== undefined) {
+				this.asset_properties.float_value = parseFloat(p.float_value);
+			} else if (p.propertyid === 3 && (p.int_value !== undefined || p.string_value !== undefined)) {
+				this.asset_properties.charm_template = p.int_value !== undefined ? parseInt(p.int_value, 10) : p.string_value;
+			} else if (p.propertyid === 5 && p.string_value !== undefined) {
+				this.asset_properties.nametag = p.string_value;
+			} else if (p.propertyid === 6 && p.string_value !== undefined) {
+				this.asset_properties.item_certificate = p.string_value;
+			} else if (p.propertyid === 7 && (p.int_value !== undefined || p.string_value !== undefined)) {
+				this.asset_properties.finish_catalog = p.int_value !== undefined ? parseInt(p.int_value, 10) : p.string_value;
+			}
+		}
+	}
+
+	// asset_accessories: each has parent_relationship_properties; propertyid 4 = sticker_wear (float)
+	this.asset_accessories = [];
+	if (assetProperties && assetProperties.asset_accessories && Array.isArray(assetProperties.asset_accessories)) {
+		for (var j = 0; j < assetProperties.asset_accessories.length; j++) {
+			var acc = assetProperties.asset_accessories[j];
+			var parsed = { classid: acc.classid };
+			var relProps = acc.parent_relationship_properties;
+			if (relProps && Array.isArray(relProps)) {
+				for (var k = 0; k < relProps.length; k++) {
+					var rp = relProps[k];
+					if (rp.propertyid === 4 && rp.float_value !== undefined) {
+						parsed.sticker_wear = parseFloat(rp.float_value);
+						break;
+					}
+				}
+			}
+			this.asset_accessories.push(parsed);
 		}
 	}
 
