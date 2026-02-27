@@ -71,5 +71,12 @@
 			"esbuild",
 			"protobufjs"
 		]
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"require": "./index.js",
+			"default": "./dist/index.js"
+		}
 	}
 }
