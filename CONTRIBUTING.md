@@ -1,36 +1,74 @@
-# Contributing to SteamCommunity
+# Contributing
 
-Thanks for your interest in making `SteamCommunity` better! I'd appreciate it if you read over this document quickly
-before you submit your issue or pull request. It'll make things go much smoother.
+Thanks for your interest in contributing to this TypeScript fork of node-steamcommunity!
 
-# Issues
+## Issues
 
-Submitting an issue?
+- **Bug report** — include a descriptive title, what you expected vs. what happened, a minimal code snippet, and the full error message + stack trace.
+- **Feature request** — describe what you want and why it fits the scope of this library.
+- **Question / support** — open a Discussion, not an Issue.
 
-- If you're **reporting a bug**, please include all relevant details.
-	- A descriptive title helps for one. Titles of just "Error" or "It doesn't work" really don't help.
-	- Please describe what you're trying to do, what actually happens, and what you can do to reproduce the problem.
-	- If you have an error message or a crash, please include the full text of the error message and the stack trace.
-	- Include the relevant snippet of your code. Wrap it in \`\`\`js /* code */ \`\`\` and GitHub [will format it nicely for you](https://help.github.com/articles/github-flavored-markdown/#syntax-highlighting).
-- If you're **requesting a feature**, please be descriptive and understanding.
-	- A good title makes a difference. Please briefly describe what you're requesting in the title.
-	- Be descriptive in the issue body, too. Say what you want to do, and ideally what the method should be named.
-	- Be understanding if I don't think that your feature request falls within the scope of this module.
-- If you're **asking a question** or **requesting support**, please don't submit a GitHub issue.
-	- Issues are only for problems directly relating to the module's code.
-	- Please [post a thread in the dedicated forum](https://dev.doctormckay.com/forum/8-node-steamcommunity/) instead.
+## Pull Requests
 
-# Pull Requests
+### Code style
 
-Submitting a pull request? Great! Thanks for contributing your time and code! Please keep the following in mind.
+- TypeScript with strict mode — no `any` unless unavoidable
+- Tabs for indentation
+- camelCase for variables and functions
+- Opening braces on the same line
+- All new public methods must be declared in the relevant `declare module` augmentation block
 
-- Please follow the existing code style.
-	- Tabs for indentation
-	- camelCase for variables and functions
-	- Opening braces on the same line as the if/for/while statement
-	- No omitting unnecessary braces
-	- etc.
-- Please avoid breaking changes. If you make a breaking change that can be done in a backwards-compatible manner, I won't accept it.
-- Please don't increment the version number in `package.json`. I'll do that myself when I publish it to npm.
-- Please include a brief description of your change in the pull request if it's not immediately apparent from the code.
-- Be understanding if I don't think that your change falls within the scope of this module.
+### Adding a method
+
+1. Add the implementation to the relevant `src/components/*.ts` or `src/classes/*.ts` file
+2. Declare the method signature in the same file's `declare module '../SteamCommunity'` block
+3. Export any new public types from `src/index.ts`
+4. Add a runnable example in `examples/` if the method is testable without login
+
+### Things to keep in mind
+
+- Do not increment the version in `package.json` — that is handled at release time
+- Run `pnpm build` before submitting to make sure the TypeScript compiles cleanly
+- The `dist/` directory is committed — rebuild it (`pnpm build`) if your change affects the output
+- Do not add `pnpm-lock.yaml` — this is a library, consumers manage their own lockfiles
+- Avoid breaking changes to existing public method signatures
+
+## Architecture notes
+
+The codebase uses TypeScript **module augmentation** to keep the modular file structure of the original JavaScript:
+
+```text
+src/SteamCommunity.ts        ← base class (constructor, cookie management)
+src/components/http.ts       ← attaches httpRequest / httpRequestGet / httpRequestPost
+src/components/users.ts      ← attaches addFriend, getUserInventoryContents, etc.
+...
+```
+
+Each component file does:
+
+```ts
+declare module '../SteamCommunity' {
+    interface SteamCommunity {
+        myNewMethod(...): void;
+    }
+}
+
+SteamCommunity.prototype.myNewMethod = function(this: SteamCommunity, ...) {
+    // implementation
+};
+```
+
+**Important:** Use `declare fieldName: Type` (not `fieldName!: Type`) for any prototype method stubs in the base class. The `!:` syntax creates an ES2024 class field initialised to `undefined` which shadows the prototype method.
+
+## Running examples
+
+```bash
+pnpm run example:inventory     # CS2 inventory (no login)
+pnpm run example:market-apps   # Steam Market app list (no login)
+pnpm run example:comments      # Profile comments (no login)
+pnpm run example:user          # Steam user profile (no login)
+pnpm run example:group-info    # Group info + RSS (no login)
+pnpm run example:confirmations # Confirmations (requires login)
+pnpm run example:enable-2fa    # Enable 2FA (requires login)
+pnpm run example:disable-2fa   # Disable 2FA (requires login)
+```

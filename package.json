@@ -1,21 +1,34 @@
 {
 	"name": "steamcommunity",
-	"version": "4.0.2",
+	"version": "4.1.0",
 	"description": "Provides an interface for logging into and interacting with the Steam Community website",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
 	"files": [
-		"/classes",
-		"/components",
-		"/examples",
-		"/resources",
-		"/index.js"
+		"dist",
+		"src"
 	],
+	"scripts": {
+		"build": "tsc",
+		"build:watch": "tsc --watch",
+		"prepublishOnly": "tsc",
+		"example:inventory": "tsx examples/get-inventory.ts",
+		"example:market-apps": "tsx examples/get-market-apps.ts",
+		"example:comments": "tsx examples/get-user-comments.ts",
+		"example:user": "tsx examples/get-steam-user.ts",
+		"example:group-info": "tsx examples/get-group-info.ts",
+		"example:confirmations": "tsx examples/accept_all_confirmations.ts",
+		"example:enable-2fa": "tsx examples/enable_twofactor.ts",
+		"example:disable-2fa": "tsx examples/disable_twofactor.ts",
+		"example:group": "tsx examples/edit-group-announcement.ts"
+	},
 	"keywords": [
 		"steam",
 		"steam community"
 	],
-	"homepage": "https://github.com/DoctorMcKay/node-steamcommunity",
+	"homepage": "https://github.com/bekesibeni/node-steamcommunity",
 	"bugs": {
-		"url": "https://github.com/DoctorMcKay/node-steamcommunity/issues"
+		"url": "https://github.com/bekesibeni/node-steamcommunity/issues"
 	},
 	"license": "MIT",
 	"author": {
@@ -23,22 +36,39 @@
 		"email": "mckay@doctormckay.com",
 		"url": "https://www.doctormckay.com"
 	},
+	"contributors": [
+		{
+			"name": "bekesibeni",
+			"url": "https://github.com/bekesibeni"
+		}
+	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/DoctorMcKay/node-steamcommunity.git"
+		"url": "https://github.com/bekesibeni/node-steamcommunity.git"
 	},
 	"dependencies": {
 		"@doctormckay/stdlib": "^2.10.0",
 		"@doctormckay/user-agents": "^1.0.0",
-		"cheerio": "^1.2.0",
+		"fast-xml-parser": "^5.4.1",
 		"image-size": "^2.0.2",
+		"node-html-parser": "^7.0.2",
 		"socks-proxy-agent": "^8.0.5",
 		"steam-session": "^1.9.4",
 		"steam-totp": "^2.1.2",
-		"steamid": "^2.1.0",
-		"xml2js": "^0.6.2"
+		"steamid": "^2.1.0"
 	},
 	"engines": {
 		"node": ">=20.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^25.3.2",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"protobufjs"
+		]
 	}
 }
