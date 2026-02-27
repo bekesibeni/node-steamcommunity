@@ -2,9 +2,10 @@
 	"name": "steamcommunity",
 	"version": "4.1.0",
 	"description": "Provides an interface for logging into and interacting with the Steam Community website",
-	"main": "dist/index.js",
+	"main": "index.js",
 	"types": "dist/index.d.ts",
 	"files": [
+		"index.js",
 		"dist",
 		"src"
 	],
