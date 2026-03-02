@@ -164,19 +164,18 @@ SteamCommunity.prototype.acceptConfirmationForObject = function (
 	callback: SimpleCallback,
 ): void {
 	this._usedConfTimes ??= [];
+	const self = this;
 
 	if (this._timeOffset !== undefined) {
 		doConfirmation();
 	} else {
 		SteamTotp.getTimeOffset((err, offset) => {
 			if (err) { callback(err); return; }
-			this._timeOffset = offset;
+			self._timeOffset = offset;
 			doConfirmation();
-			setTimeout(() => { delete this._timeOffset; }, 1000 * 60 * 60 * 12).unref();
+			setTimeout(() => { delete self._timeOffset; }, 1000 * 60 * 60 * 12).unref();
 		});
 	}
-
-	const self = this;
 
 	function doConfirmation(): void {
 		const offset = self._timeOffset!;

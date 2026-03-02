@@ -131,6 +131,7 @@ SteamCommunity_1.SteamCommunity.prototype.respondToConfirmation = function (conf
 // ─── acceptConfirmationForObject ─────────────────────────────────────────────
 SteamCommunity_1.SteamCommunity.prototype.acceptConfirmationForObject = function (identitySecret, objectID, callback) {
     this._usedConfTimes ??= [];
+    const self = this;
     if (this._timeOffset !== undefined) {
         doConfirmation();
     }
@@ -140,12 +141,11 @@ SteamCommunity_1.SteamCommunity.prototype.acceptConfirmationForObject = function
                 callback(err);
                 return;
             }
-            this._timeOffset = offset;
+            self._timeOffset = offset;
             doConfirmation();
-            setTimeout(() => { delete this._timeOffset; }, 1000 * 60 * 60 * 12).unref();
+            setTimeout(() => { delete self._timeOffset; }, 1000 * 60 * 60 * 12).unref();
         });
     }
-    const self = this;
     function doConfirmation() {
         const offset = self._timeOffset;
         let time = steam_totp_1.default.time(offset);
