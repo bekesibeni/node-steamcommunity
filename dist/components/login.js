@@ -53,8 +53,12 @@ SteamCommunity_1.SteamCommunity.prototype._modernLogin = function (logOnDetails)
         const session = new LoginSession(logOnDetails.disableMobile
             ? EAuthTokenPlatformType.WebBrowser
             : EAuthTokenPlatformType.MobileApp, {
-            localAddress: this._options.localAddress,
             userAgent: this._options.userAgent ?? (0, user_agents_1.chrome)(),
+            ...(this._options.socksProxy
+                ? { socksProxy: this._options.socksProxy }
+                : this._options.httpProxy
+                    ? { httpProxy: this._options.httpProxy }
+                    : { localAddress: this._options.localAddress }),
         });
         session.on('authenticated', async () => {
             try {

@@ -111,8 +111,12 @@ SteamCommunity.prototype._modernLogin = function (
 				? EAuthTokenPlatformType.WebBrowser
 				: EAuthTokenPlatformType.MobileApp,
 			{
-				localAddress: this._options.localAddress,
 				userAgent: this._options.userAgent ?? chrome(),
+				...(this._options.socksProxy
+					? { socksProxy: this._options.socksProxy }
+					: this._options.httpProxy
+						? { httpProxy: this._options.httpProxy }
+						: { localAddress: this._options.localAddress }),
 			},
 		);
 

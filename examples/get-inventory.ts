@@ -35,7 +35,7 @@ function getInventory(steamID: string): Promise<{ inventory: CEconItem[]; curren
 			CS2_CONTEXT_ID,
 			false,       // tradableOnly — false so we see all items
 			'english',
-			(err, inventory, currency, totalCount) => {
+			(err: Error | null, inventory: CEconItem[], currency: CEconItem[], totalCount: number) => {
 				if (err) return reject(err);
 				resolve({ inventory, currency, totalCount });
 			},
